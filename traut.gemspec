@@ -7,7 +7,7 @@ Gem::Specification.new do |s|
   s.version     = Traut::VERSION
   s.authors     = ["Brian L. Troutwine"]
   s.email       = ["brian.troutwine@carepilot.com"]
-  s.homepage    = ""
+  s.homepage    = "https://github.com/CarePilot/Traut"
   s.summary     = %q{Turns AMQP events to system command execution}
   s.description = %q{Traut is a configurable daemon for running localhost commands in response to events generated elsewhere. AMQP is used as the interchange. Traut can make application deployments in response to code checkins, automate database failover and anything else that can be scripted. It needs only companions to pump events through the 'traut' exchange.}
 
