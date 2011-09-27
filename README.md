@@ -28,7 +28,7 @@ Installation
 
 Traut is distributed through the RubyGems
 
-   gem install traut
+    gem install traut
 
 You're tasked with providing your own init scripts and configuration
 files. See the contents of etc/ for an example traut.conf. Note that
