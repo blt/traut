@@ -1,0 +1,10 @@
+amqp:
+    :host: localhost
+    :port: 5672
+logs: /tmp/traut.log
+pid:  /tmp/traut.pid
+scripts: /tmp/traut/scripts
+daemon: true
+
+actions:
+    com.carepilot.event.code.review.app: deploy/app

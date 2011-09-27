@@ -1,0 +1,6 @@
+#!/usr/bin/env ruby
+# Traut command line interface script.
+# Run <tt>traut -h</tt> to get more usage.
+
+require 'traut'
+Traut::Runner.new(ARGV).run!

@@ -1,0 +1,106 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'optparse'
+require 'net/ssh'
+require 'json'
+require 'yaml'
+require 'amqp'
+require 'logger'
+
+trap(:INT) { puts; exit }
+
+options = {
+  :logs => 'kili.log',
+  :amqp => {
+    :host => 'localhost',
+    :port => '5672',
+  },
+  :ssh => {
+    :host => 'localhost',
+    :port => '22',
+    :user => 'nobody',
+    :keys => '~/.ssh/id_rsa',
+  }
+}
+optparse = OptionParser.new do|opts|
+  opts.banner = "Usage: kili [options]"
+  opts.on( '--amqp_host HOST', 'The AMQP host kili will connect to.') do |a|
+    options[:amqp][:host] = a
+  end
+  opts.on( '--amqp_port PORT', 'The port for the AMQP host.') do |ap|
+    options[:amqp][:port] = ap
+  end
+  opts.on( '--ssh_host HOST', 'The SSH host kili will connect to.') do |s|
+    options[:ssh][:host] = s
+  end
+  opts.on( '--ssh_port PORT', 'The SSH port kili will connect on.') do |sp|
+    options[:ssh][:port] = sp
+  end
+  opts.on( '--ssh_keys KEYS', 'Comma delimeted SSH keys for user.') do |sk|
+    options[:ssh][:keys] = sk
+  end
+  opts.on( '--ssh_user USER', 'SSH user for host.') do |su|
+    options[:ssh][:user] = su
+  end
+  opts.on( '-l', '--log', 'The log location of Kili') do |log|
+    options[:logs] = log
+  end
+  opts.on( '-h', '--help', 'Display this screen' ) do
+    puts opts
+    exit
+  end
+end
+
+optparse.parse!
+log = Logger.new(options[:logs])
+log.level = Logger::INFO
+
+amqp = options[:amqp]
+sshd = options[:ssh]
+
+loop do
+  begin
+    EventMachine.run do
+      AMQP.connect(:host => amqp[:host]) do |connection|
+        log.info "Connected to AMQP at #{amqp[:host]}:#{amqp[:port]}"
+        channel  = AMQP::Channel.new(connection)
+        exchange = channel.topic("traut", :auto_delete => true)
+
+        Net::SSH.start(sshd[:host], sshd[:user],
+          :port => sshd[:port], :keys => sshd[:keys].split(',')) do |ssh|
+          channel = ssh.open_channel do |ch|
+            ch.exec "gerrit stream-events" do |ch, success|
+              abort "could not stream gerrit events" unless success
+
+              # "on_data" is called when the process writes something to
+              # stdout
+              ch.on_data do |c, data|
+                json = JSON.parse(data)
+                if json['type'] == 'change-merged'
+                  log.info("Received change-merged event.")
+                  project = json['change']['project']
+                  exchange.publish(json, "com.carepilot.event.code.review.#{project}")
+                else
+                  log.info("Ignoring event of type #{json['type']}")
+                end
+              end
+
+              # "on_extended_data" is called when the process writes
+              # something to stderr
+              ch.on_extended_data do |c, type, data|
+                log.error(data)
+              end
+
+              ch.on_close { log.info('Connection closed') }
+            end
+          end
+
+          channel.wait
+        end
+      end
+    end
+  rescue Net::SSH::Exception => e
+    log.error("Connection died with exception #{e}. Restarting...")
+  end
+end
