@@ -19,9 +19,10 @@ daemon hooked up to Gerrit's ssh stream-events so that we might turn
 example. See `samples/kili`. All payloads are delivered to the
 scripts' stdin.
 
-Traut cannot daemonize itself. We use [supervisord](http://supervisord.org/) to daemonize Traut;
-the code needed to achieve self-daemonization is outside of the core
-focus of this program.
+Traut cannot daemonize itself. We use
+[supervisord](http://supervisord.org/) to daemonize Traut; the code
+needed to achieve self-daemonization is outside of the core focus of
+this program.
 
 Installation
 ------------

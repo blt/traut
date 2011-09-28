@@ -20,11 +20,12 @@ module Traut
           :host => 'localhost',
           :port => '5672'
         },
-        :logs      => '/var/log/traut.log',
-        :config    => '/etc/traut/traut.conf',
-        :scripts   => '/usr/local/bin/traut',
-        :debug     => false,
-        :actions   => nil,
+        :logs       => '/var/log/traut.log',
+        :config     => '/etc/traut/traut.conf',
+        :action_dir => '/etc/traut/actions/',
+        :scripts    => '/usr/local/bin/traut',
+        :debug      => false,
+        :actions    => nil,
       }
 
       parse!
@@ -34,22 +35,22 @@ module Traut
       @parser ||= OptionParser.new do |opts|
         opts.banner = "Usage: traut [options]"
         opts.separator ""
-        opts.on("-A", "--amqp [HOST]", "The AMQP server host") {
+        opts.on("-A", "--amqp HOST", "The AMQP server host") {
           |host| @options[:amqp][:host] = host
         }
-        opts.on("-P", "--amqp_port [PORT]", "The AMQP server host port") {
+        opts.on("-P", "--amqp_port PORT", "The AMQP server host port") {
           |port| @options[:amqp][:port] = port
         }
-        opts.on("-S", "--subscriptions", "The server AMQP subscriptions.") {
-          |subscriptions| @options[:subscriptions] = subscriptions || '*'
-        }
-        opts.on("-C", "--config [FILE]", "Load options from config file") {
+        opts.on("-C", "--config FILE", "Load options from config file") {
           |file| @options[:config] = file
         }
-        opts.on("-s", "--scripts", "Location of traut scripts directory") {
+        opts.on("-s", "--scripts DIR", "Location of traut scripts directory"){
           |scripts| @options[:scripts] = scripts
         }
-        opts.on('-l', '--logs [LOG]', "Location of log directory location") {
+        opts.on("-a", "--actions DIR", "Location of traut actions directory"){
+          |acts| @options[:action_dir] = acts
+        }
+        opts.on('-l', '--logs LOG', "Location of log directory location") {
           |log| @options[:logs] = log
         }
         opts.on('--debug', 'Enable debug logging') {
@@ -108,6 +109,14 @@ module Traut
         YAML.load_file(file).each {
           |key, value| @options[key.to_sym] = value
         }
+        dir = Dir.open(@options[:action_dir])
+        @options[:actions] = {}
+        dir.each do |f|
+          af = File.join(dir, f)
+          if ! File.directory? af
+            YAML.load_file(af).each { |k,v| @options[:actions][k] = v }
+          end
+        end
       end
     end
 
