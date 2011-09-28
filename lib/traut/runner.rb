@@ -112,7 +112,7 @@ module Traut
         dir = Dir.open(@options[:action_dir])
         @options[:actions] = {}
         dir.each do |f|
-          af = File.join(dir, f)
+          af = File.join(@options[:action_dir], f)
           if ! File.directory? af
             YAML.load_file(af).each { |k,v| @options[:actions][k] = v }
           end
