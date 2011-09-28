@@ -82,7 +82,7 @@ loop do
                 if json['type'] == 'change-merged'
                   log.info("Received change-merged event.")
                   project = json['change']['project']
-                  exchange.publish(json, "com.carepilot.event.code.review.#{project}")
+                  exchange.publish(data, "com.carepilot.event.code.review.#{project}")
                 else
                   log.info("Ignoring event of type #{json['type']}")
                 end
