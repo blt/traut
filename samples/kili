@@ -43,7 +43,7 @@ optparse = OptionParser.new do|opts|
   opts.on( '--ssh_user USER', 'SSH user for host.') do |su|
     options[:ssh][:user] = su
   end
-  opts.on( '-l', '--log', 'The log location of Kili') do |log|
+  opts.on( '-l', '--log LOG', 'The log location of Kili') do |log|
     options[:logs] = log
   end
   opts.on( '-h', '--help', 'Display this screen' ) do
@@ -69,6 +69,8 @@ loop do
 
         Net::SSH.start(sshd[:host], sshd[:user],
           :port => sshd[:port], :keys => sshd[:keys].split(',')) do |ssh|
+          log.info "SSH connection to #{sshd[:host]}:#{sshd[:port]} as #{sshd[:user]} made."
+
           channel = ssh.open_channel do |ch|
             ch.exec "gerrit stream-events" do |ch, success|
               abort "could not stream gerrit events" unless success
