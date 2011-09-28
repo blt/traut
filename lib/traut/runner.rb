@@ -35,10 +35,10 @@ module Traut
         opts.banner = "Usage: traut [options]"
         opts.separator ""
         opts.on("-A", "--amqp [HOST]", "The AMQP server host") {
-          |host| @options[:amqp_host] = host
+          |host| @options[:amqp][:host] = host
         }
         opts.on("-P", "--amqp_port [PORT]", "The AMQP server host port") {
-          |port| @options[:amqp_host] = port
+          |port| @options[:amqp][:port] = port
         }
         opts.on("-S", "--subscriptions", "The server AMQP subscriptions.") {
           |subscriptions| @options[:subscriptions] = subscriptions || '*'

@@ -12,7 +12,7 @@ module Traut
 
     def loop
       EventMachine.run do
-        AMQP.connect(:host => @amqp[:host]) do |connection|
+        AMQP.connect(:host => @amqp[:host], :port => @amqp[:port]) do |connection|
           @log.info "Connected to AMQP at #{@amqp[:host]}:#{@amqp[:port]}"
           channel  = AMQP::Channel.new(connection)
           exchange = channel.topic("traut", :auto_delete => true)
