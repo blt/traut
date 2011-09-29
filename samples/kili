@@ -5,7 +5,7 @@ require 'optparse'
 require 'net/ssh'
 require 'json'
 require 'yaml'
-require 'amqp'
+require 'bunny'
 require 'logger'
 
 trap(:INT) { puts; exit }
@@ -21,6 +21,7 @@ options = {
     :port => '22',
     :user => 'nobody',
     :keys => '~/.ssh/id_rsa',
+    :command => 'gerrit stream-events'
   }
 }
 optparse = OptionParser.new do|opts|
@@ -43,6 +44,9 @@ optparse = OptionParser.new do|opts|
   opts.on( '--ssh_user USER', 'SSH user for host.') do |su|
     options[:ssh][:user] = su
   end
+  opts.on( '--command CMD', 'Command to run through SSH exec.') do |cmd|
+    options[:ssh][:command] = cmd
+  end
   opts.on( '-l', '--log LOG', 'The log location of Kili') do |log|
     options[:logs] = log
   end
@@ -59,50 +63,43 @@ log.level = Logger::INFO
 amqp = options[:amqp]
 sshd = options[:ssh]
 
-loop do
-  begin
-    EventMachine.run do
-      AMQP.connect(:host => amqp[:host]) do |connection|
-        log.info "Connected to AMQP at #{amqp[:host]}:#{amqp[:port]}"
-        channel  = AMQP::Channel.new(connection)
-        exchange = channel.topic("traut", :auto_delete => true)
+Net::SSH.start(sshd[:host], sshd[:user],
+  :port => sshd[:port], :keys => sshd[:keys].split(',')) do |ssh|
+  log.info "SSH connection to #{sshd[:host]}:#{sshd[:port]} as #{sshd[:user]} made."
 
-        Net::SSH.start(sshd[:host], sshd[:user],
-          :port => sshd[:port], :keys => sshd[:keys].split(',')) do |ssh|
-          log.info "SSH connection to #{sshd[:host]}:#{sshd[:port]} as #{sshd[:user]} made."
+  bunny = Bunny.new(:host => amqp[:host], :port => amqp[:port])
+  bunny.start
+  log.info "AMQP connection made to #{amqp[:host]}:#{amqp[:port]}"
 
-          channel = ssh.open_channel do |ch|
-            ch.exec "gerrit stream-events" do |ch, success|
-              abort "could not stream gerrit events" unless success
+  exch = bunny.exchange('traut', :durable => false, :passive => true, :auto_delete => true)
 
-              # "on_data" is called when the process writes something to
-              # stdout
-              ch.on_data do |c, data|
-                json = JSON.parse(data)
-                if json['type'] == 'change-merged'
-                  log.info("Received change-merged event.")
-                  project = json['change']['project']
-                  exchange.publish(data, "com.carepilot.event.code.review.#{project}")
-                else
-                  log.info("Ignoring event of type #{json['type']}")
-                end
-              end
+  channel = ssh.open_channel do |ch|
+    ch.exec sshd[:command] do |ch, success|
+      abort "could not stream #{sshd[:command]}" unless success
 
-              # "on_extended_data" is called when the process writes
-              # something to stderr
-              ch.on_extended_data do |c, type, data|
-                log.error(data)
-              end
-
-              ch.on_close { log.info('Connection closed') }
-            end
-          end
-
-          channel.wait
+      # "on_data" is called when the process writes something to
+      # stdout
+      ch.on_data do |c, data|
+        json = JSON.parse(data)
+        if json['type'] == 'change-merged'
+          project = json['change']['project']
+          route = "com.carepilot.event.code.review.#{project}"
+          exch.publish(data, :key => route)
+          log.info("Published #{data} over #{route}")
+        else
+          log.info("Ignoring event of type #{json['type']}")
         end
       end
+
+      # "on_extended_data" is called when the process writes
+      # something to stderr
+      ch.on_extended_data do |c, type, data|
+        log.error(data)
+      end
+
+      ch.on_close { log.info('Connection closed') }
     end
-  rescue Net::SSH::Exception => e
-    log.error("Connection died with exception #{e}. Restarting...")
   end
+
+  channel.wait
 end
