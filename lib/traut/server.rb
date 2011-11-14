@@ -15,7 +15,7 @@ module Traut
         AMQP.connect(:host => @amqp[:host], :port => @amqp[:port]) do |connection|
           @log.info "Connected to AMQP at #{@amqp[:host]}:#{@amqp[:port]}"
           channel  = AMQP::Channel.new(connection)
-          exchange = channel.topic("traut", :auto_delete => true)
+          exchange = channel.topic('traut')
 
           @actions.each { |route, script|
             @log.info("Registering #{script} for route #{route}")
