@@ -12,7 +12,7 @@ module Traut
     def run
       load_options
 
-      @logger = Logger.new File.join( File.absolute_path(@options['logdir']), 'traut.log')
+      @logger = Logger.new File.join( File.expand_path(@options['logdir']), 'traut.log')
       @logger.level = boolean(@options['debug']) ? Logger::DEBUG : Logger::INFO
 
       ## NOTE: Have to start AMQP connection out here.
@@ -36,16 +36,17 @@ module Traut
     end
 
     def abs(p)
-      File.absolute_path(p)
+      File.expand_path(p)
     end
 
     def abs?(p)
-      abs(p) == p
+      a = abs(p)
+      [a, a+'/'].include? p
     end
 
     def mung_config_path(includedir, config)
       # if includedir is absolute do nothing else
-      includedir if abs?(includedir)
+      return includedir if abs?(includedir)
       # else take abs-dirname of config and append includedir
       File.join( abs(File.dirname(config)), includedir )
     end
