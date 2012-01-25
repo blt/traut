@@ -56,6 +56,7 @@ module Traut
         |key, value| @options[key] = value
       }
       includedir =  mung_config_path(@options['include'], @options['config'])
+      @options['events'] = [] unless @options.has_key? 'events'
       Dir.open(includedir).each do |f|
         ff = File.join(includedir, f)
         @options['events'] += YAML.load_file(ff) if File.file?(ff)
