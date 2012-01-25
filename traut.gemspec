@@ -24,7 +24,7 @@ Gem::Specification.new do |s|
   # s.add_development_dependency 'guard-rspec'
   # s.add_development_dependency 'simplecov'
 
-  s.add_runtime_dependency "amqp", '>= 0.8.0'
+  s.add_runtime_dependency "amqp", '>= 0.9.2'
   s.add_runtime_dependency "systemu", '~> 2.4'
   s.add_runtime_dependency 'json', '~> 1.6.5'
 
