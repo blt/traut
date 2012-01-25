@@ -1,6 +1,33 @@
 #!/usr/bin/env ruby
-# Traut command line interface script.
-# Run <tt>traut -h</tt> to get more usage.
+
+require 'optparse'
+require 'logger'
 
 require 'traut'
-Traut::Runner.new(ARGV).run!
+
+# Default options
+options = Traut.defaults
+
+p = OptionParser.new do |opts|
+  opts.banner = "Usage: traut [options]"
+  opts.on("-C", "--config FILE", "Load options from config file") {
+    |file| options['config'] = file
+  }
+  opts.on_tail("-h", "--help", "Show this message.") do
+    puts opts; exit
+  end
+  opts.on_tail("-v", "--version", "Show version") {
+    puts Traut::VERSION; exit
+  }
+end
+p.parse! ARGV
+
+@immortal = true
+trap('INT') { @immortal = false; EM.stop }
+trap('HUP') { EM.stop }
+
+while @immortal do
+  EventMachine.run do
+    Traut::Application.new(:options => options).run
+  end
+end

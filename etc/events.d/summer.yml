@@ -1,0 +1,7 @@
+- event: whatthesum
+  command: /usr/bin/sha512sum
+  user: blt
+  group: blt
+
+- event: passiton
+  command: cat > /tmp/bleh.txt

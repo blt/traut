@@ -1,7 +1,0 @@
-amqp:
-    :host: localhost
-    :port: 5672
-logs: /tmp/traut.log
-pid:  /tmp/traut.pid
-scripts: /tmp/traut/scripts
-action_dir: /tmp/traut/actions

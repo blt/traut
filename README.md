@@ -1,28 +1,14 @@
-Traut -- a real-time notification automaton
-===========================================
+Traut -- a cron-like for AMQP
+=============================
 
-It's not uncommon that an event will happen in a computer cluster for
-which a system administrator is needed to execute a program or two: a
-database goes down and it's time to switch to a hot-standby or there's
-a vital configuration fix that needs to go out faster than the ususal
-Puppet update interval. Maybe you have a specific human process that's
-kicked off when a 5xx HTTP error gets recorded by your
-httpd. Heretofore someone scans the logs periodically, though it could
-be done by a machine. In fact, all of this could be done by a machine.
+Unix cron's an ancient program that runs a script dependent on the passage
+time. Traut's the same way, except it keys off AMQP events instead. Use it to
+update your Puppet machines or log-rotate if nagios sends a disk-full
+warning. Significant number of possibilities.
 
-Traut is a program which listens to an AMQP queue and executes scripts
-found in local `/usr/local/bin/traut/` based on the message route. It
-is presumed that traut will be supported by a small legion of log
-watchers, daemon prodders and otherwise. Here at CarePilot, we have a
-daemon hooked up to Gerrit's ssh stream-events so that we might turn
-'change-merged' events into immediate project deployments, for
-example. See `samples/kili`. All payloads are delivered to the
-scripts' stdin.
-
-Traut cannot daemonize itself. We use
-[supervisord](http://supervisord.org/) to daemonize Traut; the code
-needed to achieve self-daemonization is outside of the core focus of
-this program.
+Traut cannot daemonize itself. Use [supervisord](http://supervisord.org/) or
+similar to daemonize Traut; the code needed to achieve self-daemonization is
+outside of the core focus of this program.
 
 Installation
 ------------
@@ -37,9 +23,31 @@ files. See the contents of etc/ for an example traut.conf. Note that
 response to `com.carepilot.event.code.review.app` events, making its
 full path `/tmp/traut/scripts/deploy/app`.
 
-Known Issues
-------------
+Configuration
+-------------
 
-* traut has no ability to reload its configuration or restart. It must
-  be killed and started.
-* traut doesn't do log rotation. Run logrotate on your system.
+The source distribution has an [etc/](etc/) directory with example
+configuration.
+
+Use
+---
+
+Run traut from the root of the project like this:
+
+    bundle exec bin/traut -C etc/traut.conf
+
+Now, using [hare](https://github.com/blt/hare):
+
+    $ hare --exchange_name traut --exchange_type topic --route_key whatthesum
+    --producer "that wasn't so bad"
+
+You should see nothing. Open up another terminal and
+
+    $ hare --exchange_name traut --exchange_type topic --route_key 'whatthesum.exited'
+
+Note that the route key is the same as before, save that '.exited' has been
+appended to it. Listen to this channel if you need notification of
+success. Run both hare commands in the order presented, notice the second print
+a json hash.
+
+See the sample configuration file for more details.

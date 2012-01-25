@@ -1,41 +1,54 @@
-require 'amqp'
+require 'json'
 require 'systemu'
 
 module Traut
 
   class Server
-    def initialize(amqp, actions, log)
-      @amqp = amqp
-      @actions = actions
-      @log  = log
+    def initialize(params)
+      @channel = params[:channel] || raise('parameter :channel required')
+      @exchange = params[:exchange] || raise('parameter :exchange required')
+      @events = params[:events] || raise('parameter :events required')
+      @log = params[:log] || raise('parameter :log required')
     end
 
-    def loop
-      EventMachine.run do
-        AMQP.connect(:host => @amqp[:host], :port => @amqp[:port]) do |connection|
-          @log.info "Connected to AMQP at #{@amqp[:host]}:#{@amqp[:port]}"
-          channel  = AMQP::Channel.new(connection)
-          exchange = channel.topic('traut')
-
-          @actions.each { |route, script|
-            @log.info("Registering #{script} for route #{route}")
-            channel.queue("").bind(exchange, :routing_key => route).subscribe do |headers, payload|
-              status, stdout, stderr = systemu script, 'stdin' => payload
-              if status.exitstatus != 0
-                @log.error("[#{script}] exit status: #{status.exitstatus}")
-                @log.error("[#{script}] stdout: #{stdout.strip}")
-                @log.error("[#{script}] stderr: #{stderr.strip}")
-              else
-                @log.info("[#{script}] exit status: #{status.exitstatus}")
-                @log.info("[#{script}] stdout: #{stdout.strip}")
-                @log.info("[#{script}] stderr: #{stderr.strip}")
-              end
-            end
-          }
-
-        end
+    # :: () -> ()
+    def run
+      subscribe('#') do |headers, payload|
+        @log.debug("Noted the reception of message with route '#{headers.routing_key}'.")
       end
+
+      @events.each do |event|
+        route, script, user, group = event['event'], event['command'], event['user'], event['group']
+        @log.debug("Registering #{script} to run as #{user}:#{group} for event #{route}")
+
+        subscribe(route) do |headers, payload|
+          Traut.spawn(:user => user, :group => group, :command => script,
+            :payload => payload, :logger => @log) do |status, stdout, stderr|
+            condition = 0 == status.exitstatus ? :debug : :error
+            result = {:exitstatus => status.exitstatus, :stdout => stdout.strip, :stderr => stderr.strip}
+            @log.send(condition, "[#{script}] #{result}")
+            publish(result.to_json, headers.routing_key)
+          end
+        end # channel.queue
+
+      end # eventmap.each
+    end # run
+
+    private
+
+    # :: string -> string
+    def finished_route(key)
+      [key, 'exited'].join('.')
     end
 
-  end
+    def publish(msg, route)
+      @exchange.publish msg, :routing_key => finished_route(route)
+    end
+
+    def subscribe(route, &block)
+      @channel.queue('').bind(@exchange, :routing_key => route).subscribe(&block)
+    end
+
+  end # Server
+
 end
