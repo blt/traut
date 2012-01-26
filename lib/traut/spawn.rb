@@ -20,8 +20,11 @@ module Traut
       runas(uid, gid) do
         # Why do I use systemu? Have a look at this:
         ## http://stackoverflow.com/questions/8998097/how-do-i-close-eventmachine-systems-side-of-an-stdin-pipe
-        status, stdout, stderr = systemu command, 0=>payload
-        block.call(status, stdout, stderr)
+        Process.fork do
+          puts Process.pid
+          status, stdout, stderr = systemu command, 0=>payload
+          block.call(status, stdout, stderr)
+        end
 
         # If you have an answer for that, consider enabling the following code,
         # keeping in mind that you need to figure out a way to get stderr back
