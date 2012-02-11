@@ -15,11 +15,22 @@ module Traut
       @logger = Logger.new File.join( File.expand_path(@options['logdir']), 'traut.log')
       @logger.level = boolean(@options['debug']) ? Logger::DEBUG : Logger::INFO
 
-      ## NOTE: Have to start AMQP connection out here.
+      ## We start the AMQP connection out here, rather than in Server, to
+      ## isolate that code from its specific duties and so that we do not have
+      ## to pass extranious configuration details into it.
       amqp = @options['amqp']
 
       AMQP.connect(:host => amqp['host'], :port => amqp['port'], :vhost => amqp['vhost'],
-        :username => amqp['username'], :password => amqp['password']) do |connection|
+        :username => amqp['username'], :password => amqp['password'], :ssl => {
+          :cert_chain_file => amqp['ssl']['cert_chain'],
+          :private_key_file => amqp['ssl']['private_key']
+        },
+        :on_tcp_connection_failure => Proc.new { |settings|
+          puts "TCP Connection failure; details:\n\n#{settings.inspect}\n\n"; exit 1
+        },
+        :on_possible_authentication_failure => Proc.new { |settings|
+          puts "Authentication failure, I'm afraid:\n\n#{settings.inspect}\n\n"; exit 1
+        }) do |connection|
         @logger.info "Traut #{Traut::VERSION} started"
         channel  = AMQP::Channel.new(connection)
         exchange = channel.topic(amqp['exchange'] || 'traut')

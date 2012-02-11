@@ -14,7 +14,8 @@ module Traut
     {
       'config' => './traut.conf',
       'logdir' => './logs/',
-      'debug'  => true
+      'debug'  => true,
+      'ssl'    => {}
     }
   end
 end
