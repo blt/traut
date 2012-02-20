@@ -17,23 +17,35 @@ module Traut
     end
 
     def spawn(uid, gid, command, payload, block)
-      runas(uid, gid) do
-        # Why do I use systemu? Have a look at this:
-        ## http://stackoverflow.com/questions/8998097/how-do-i-close-eventmachine-systems-side-of-an-stdin-pipe
-        Process.fork do
-          puts Process.pid
+      @log.debug "Running #{command} as #{uid}:#{gid}"
+      # Why do I use systemu? Have a look at this:
+      ## http://stackoverflow.com/questions/8998097/how-do-i-close-eventmachine-systems-side-of-an-stdin-pipe
+      pid = Process.fork do
+        begin
+          @log.debug("As group #{Process::GID.eid} requesting priv change to #{gid}")
+          Process::GID.change_privilege(gid)
+          @log.debug("As user #{Process::UID.eid} requesting priv change to #{uid}")
+          Process::UID.change_privilege(uid)
+
+          @log.debug("Feeding #{command} stdin '#{payload}'")
           status, stdout, stderr = systemu command, 0=>payload
           block.call(status, stdout, stderr)
+
+          @log.info("#{command} exited with #{status}, stderr #{stderr}")
+        rescue => err
+          @log.fatal("Caught exception is subprocess")
+          @log.fatal(err)
         end
-
-        # If you have an answer for that, consider enabling the following code,
-        # keeping in mind that you need to figure out a way to get stderr back
-        # as well.
-
-        # EM.system command, proc{ |p| msg(p, payload) } do |stdout,status|
-        #     @log.debug("#{stdout} :: #{status}")
-        # end
       end
+      Process.detach pid
+
+      # If you have an answer for that, consider enabling something like
+      # following code, keeping in mind that you need to figure out a way to get
+      # stderr back as well.
+
+      # EM.system command, proc{ |p| msg(p, payload) } do |stdout,status|
+      #     @log.debug("#{stdout} :: #{status}")
+      # end
     end
 
     private
@@ -41,18 +53,5 @@ module Traut
       process.send_data(m + "\n")
     end
 
-    def runas(uid, gid, &block)
-      cur_uid = Process::UID.eid
-      cur_gid = Process::GID.eid
-
-      begin
-        Process::UID.change_privilege(uid)
-        Process::GID.change_privilege(gid)
-        block.call
-      ensure
-        Process::UID.change_privilege(cur_uid)
-        Process::GID.change_privilege(cur_gid)
-      end
-    end
   end
 end
